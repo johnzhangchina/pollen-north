@@ -55,7 +55,7 @@ API：`/api/cities`、`/api/pollen/latest?days=7`、`/api/pollen/history?city=ba
 服务端只做定时抓取和吐 JSON，推算模型在浏览器里跑，所以整站可以按"静态文件 + 定时任务"部署，不需要常驻服务器：
 
 1. 把仓库推到 GitHub（`data/pollen.sqlite`、`data/boundaries/`、`data/landcover/fractions.json` 都要入库，历史和底图数据靠它们）。
-2. Cloudflare 控制台新建 Pages 项目（Direct Upload 方式，名字默认 `pollen-north`），创建一个权限为 *Cloudflare Pages: Edit* 的 API Token。
+2. Cloudflare：右上角头像 → My Profile → API Tokens，创建一个权限为 *Account · Cloudflare Pages · Edit* 的 Token；Account ID 在控制台网址 `dash.cloudflare.com/<Account ID>/...` 里。Pages 项目不用手动建，workflow 第一次运行会自动创建。
 3. 在 GitHub 仓库 Settings → Secrets and variables 里填：
    - Secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`，可选 `TIANDITU_KEY`
    - Variables：可选 `CF_PAGES_PROJECT`（Pages 项目名）、`TILE_PRESET`（`amap` / `tianditu`）

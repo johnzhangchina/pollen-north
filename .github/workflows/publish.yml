@@ -90,13 +90,23 @@ jobs:
       - name: 导出静态 JSON
         run: npm run export
 
+      # Pages 项目不存在时先建一个（已存在会报错，忽略），控制台里不用手动创建
+      - name: 确保 Cloudflare Pages 项目存在
+        if: steps.target.outputs.cf == 'true'
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create ${{ vars.CF_PAGES_PROJECT || 'pollen-north' }} --production-branch=main
+
       - name: 发布到 Cloudflare Pages
         if: steps.target.outputs.cf == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy client/dist --project-name=${{ vars.CF_PAGES_PROJECT || 'pollen-north' }} --commit-dirty=true
+          command: pages deploy client/dist --project-name=${{ vars.CF_PAGES_PROJECT || 'pollen-north' }} --branch=main --commit-dirty=true
 
       - name: 上传 GitHub Pages 产物
         if: steps.target.outputs.cf != 'true'
