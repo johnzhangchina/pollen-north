@@ -56,6 +56,8 @@ export interface WindGrid {
   u: number[][]; // [t][iy*nx+ix]，m/s，向东为正
   v: number[][]; // 向北为正
   precip: number[][]; // mm/h
+  /** 传输时 u/v/precip 若为整数编码，真实值 = 值 / scale（见 shared/codec.ts） */
+  scale?: number;
 }
 
 export interface OfficialAlertRegion {

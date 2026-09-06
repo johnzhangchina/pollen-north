@@ -9,7 +9,26 @@ import { loadBoundaries } from './boundaries.ts';
 import { loadLandcover } from './landcover.ts';
 import { log, nowIso, readJson, todayCN } from './util.ts';
 import { defaultSeasonLevels } from '../shared/levels.ts';
-import type { EmissionPrior, OfficialAlert, SeasonLevel, StatusResponse } from '../shared/types.ts';
+import type { EmissionPrior, OfficialAlert, SeasonLevel, StatusResponse, WindGrid } from '../shared/types.ts';
+import { encodeBoundaries, encodeWind, type PlainFC, type QuantizedFC } from '../shared/codec.ts';
+
+let windEnc: { fetchedAt: string; data: WindGrid } | null = null;
+/** 传输编码后的风场（按 fetchedAt 缓存） */
+export function encodedWind(): WindGrid | null {
+  const w = loadWind();
+  if (!w) return null;
+  if (!windEnc || windEnc.fetchedAt !== w.fetchedAt) windEnc = { fetchedAt: w.fetchedAt, data: encodeWind(w) };
+  return windEnc.data;
+}
+
+let bdEnc: { src: unknown; data: QuantizedFC } | null = null;
+/** 量化差分编码后的边界（按对象身份缓存，loadBoundaries 本身按 mtime 缓存） */
+export function encodedBoundaries(): QuantizedFC | null {
+  const fc = loadBoundaries();
+  if (!fc) return null;
+  if (!bdEnc || bdEnc.src !== fc) bdEnc = { src: fc, data: encodeBoundaries(fc as unknown as PlainFC) };
+  return bdEnc.data;
+}
 
 export function buildStatus(scheduler: StatusResponse['scheduler'] = { scraping: false, winding: false }): StatusResponse {
   const w = loadWind();
@@ -55,8 +74,8 @@ export function exportStatic(outDir: string): string[] {
   put('alerts.json', readJson<OfficialAlert[]>(path.join(config.dataDir, 'official_alerts.json'), []));
   put('priors.json', readJson<EmissionPrior[]>(path.join(config.dataDir, 'emission_prior.json'), []));
   put('season-levels.json', readJson<SeasonLevel[]>(seasonLevelsFile(), defaultSeasonLevels));
-  put('boundaries.json', loadBoundaries() ?? { type: 'FeatureCollection', features: [] });
-  const wind = loadWind();
+  put('boundaries.json', encodedBoundaries() ?? { type: 'QuantizedFeatureCollection', q: 1000, features: [] });
+  const wind = encodedWind();
   if (wind) put('wind.json', wind);
   else log('export: 没有风场文件，跳过 wind.json');
   const lc = loadLandcover();

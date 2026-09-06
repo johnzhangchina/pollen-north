@@ -104,14 +104,40 @@ export function landcoverFile() {
   return path.join(config.dataDir, 'landcover', 'fractions.json');
 }
 
+/** 把 0.1° 的分类占比格子按整数倍聚合（均值），减小下发体积 */
+export function coarsenLandcover(g: LandcoverGrid, factor: number): LandcoverGrid {
+  if (factor <= 1) return g;
+  const nx = Math.floor(g.nx / factor);
+  const ny = Math.floor(g.ny / factor);
+  const fractions = {} as LandcoverGrid['fractions'];
+  for (const k of LANDCOVER_KEYS) {
+    const src = g.fractions[k];
+    const out = new Array<number>(nx * ny);
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        let sum = 0;
+        for (let dy = 0; dy < factor; dy++) for (let dx = 0; dx < factor; dx++) sum += src[(y * factor + dy) * g.nx + x * factor + dx];
+        out[y * nx + x] = Math.round(sum / (factor * factor));
+      }
+    }
+    fractions[k] = out;
+  }
+  const step = g.step * factor;
+  return { ...g, step, nx, ny, bbox: [g.bbox[0], g.bbox[1], g.bbox[0] + nx * step, g.bbox[1] + ny * step], fractions };
+}
+
 let cache: { mtime: number; data: LandcoverGrid } | null = null;
+/** 读取并按 LANDCOVER_SERVE_STEP 聚合后的格子（按文件修改时间缓存） */
 export function loadLandcover(): LandcoverGrid | null {
   const f = landcoverFile();
   try {
     const st = statSync(f);
     if (cache && cache.mtime === st.mtimeMs) return cache.data;
-    const data = readJson<LandcoverGrid | null>(f, null);
-    if (data) cache = { mtime: st.mtimeMs, data };
+    const raw = readJson<LandcoverGrid | null>(f, null);
+    if (!raw) return null;
+    const factor = Math.max(1, Math.round(config.landcoverServeStep / raw.step));
+    const data = coarsenLandcover(raw, factor);
+    cache = { mtime: st.mtimeMs, data };
     return data;
   } catch {
     return null;

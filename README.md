@@ -67,6 +67,10 @@ API：`/api/cities`、`/api/pollen/latest?days=7`、`/api/pollen/history?city=ba
 
 海外免费托管在国内偶有慢或抽风，Cloudflare 是其中最稳的；等有预算再绑自己的域名，那也是接广告的前提。
 
+### 首屏体积
+
+手机首次加载慢的主因是三份大文件。现在的传输编码（`shared/codec.ts`）把 brotli 后的体积从约 2.3 MB 压到约 1 MB：风场 u/v/降水按 0.1 量化为整数（519 KB），地级市边界坐标按 1e-3° 量化并差分（324 KB），植被格子下发时聚合到 0.2°（155 KB，`LANDCOVER_SERVE_STEP`）。加载顺序也改成：小文件 → 地图与站点 → 实测 → 风场（粒子先动起来）→ 边界与植被 → 推算模型。
+
 ## 底图与坐标系
 
 默认底图是高德栅格瓦片（`VITE_TILE_PRESET=amap`）：中文、国内加载快、免 key，但它和 DataV 边界都是 GCJ-02 坐标。站点、先验区这些 WGS84 数据叠加时会做同向偏移；风场和 25 km 的推算色块不转换，误差不到 1 公里，肉眼看不出。高德瓦片服务条款并未开放第三方直连，个人研究可用，**要上线请切天地图**：到 tianditu.gov.cn 免费申请个人 key，然后在 `.env` 里设 `VITE_TILE_PRESET=tianditu` 和 `VITE_TIANDITU_KEY=…`，天地图是 CGCS2000（≈WGS84），无需偏移。其他可选：`osm`（中国境内中文，国内访问慢）、`esri`（浅灰英文）。

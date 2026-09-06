@@ -1,4 +1,5 @@
 import type { BoundaryFC } from './boundaries.ts';
+import { decodeBoundaries, decodeWind, type QuantizedFC } from '../../shared/codec.ts';
 import type {
   City,
   EmissionPrior,
@@ -41,12 +42,12 @@ export const api = {
   isStatic: STATIC,
   cities: () => getJson<City[]>(url('cities')),
   latest: (days = 7) => getJson<LatestResponse>(url('pollen/latest', { days })),
-  wind: () => getJson<WindGrid>(url('wind')),
+  wind: () => getJson<WindGrid>(url('wind')).then(decodeWind),
   alerts: () => getJson<OfficialAlert[]>(url('alerts')),
   priors: () => getJson<EmissionPrior[]>(url('priors')),
   seasonLevels: () => getJson<SeasonLevel[]>(url('season-levels')),
   status: () => getJson<StatusResponse>(url('status')),
-  boundaries: () => getJson<BoundaryFC>(url('boundaries')),
+  boundaries: () => getJson<QuantizedFC>(url('boundaries')).then((q) => decodeBoundaries(q) as unknown as BoundaryFC),
   landcover: () => getJson<LandcoverGrid>(url('landcover')),
 };
 

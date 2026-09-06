@@ -19,16 +19,15 @@ async function main() {
   ui.renderAbout();
   const map = createMap(document.getElementById('map')!);
 
-  const [cities, levels0, alerts, priors, landcover] = await Promise.all([
+  // 首屏只等几个小文件；植被、边界、风场这些大文件在地图出来以后再加载
+  const [cities, levels0, alerts, priors] = await Promise.all([
     api.cities(),
     api.seasonLevels().catch(() => defaultSeasonLevels),
     api.alerts().catch(() => [] as OfficialAlert[]),
     api.priors().catch(() => [] as EmissionPrior[]),
-    api.landcover().catch((e) => {
-      console.warn('landcover unavailable, falling back to hand-drawn priors', e);
-      return null as LandcoverGrid | null;
-    }),
   ]);
+  let landcover: LandcoverGrid | null = null;
+  let landcoverSettled = false;
   let levels: SeasonLevel[] = levels0;
 
   ui.initSheet(map);
@@ -36,16 +35,17 @@ async function main() {
   const boundaries = new BoundaryLayer(map, levels, (code) => stations.focus(code));
   const stations = new StationLayer(map, cities, levels);
   let boundariesReady = false;
-  api
-    .boundaries()
-    .then((fc) => {
-      boundaries.setData(fc, cities);
-      heat.setMask(fc);
-      stations.bringToFront();
-      boundariesReady = true;
-      refreshLocate();
-    })
-    .catch((e) => console.warn('boundaries unavailable', e));
+  const loadBoundaries = () =>
+    api
+      .boundaries()
+      .then((fc) => {
+        boundaries.setData(fc, cities);
+        heat.setMask(fc);
+        stations.bringToFront();
+        boundariesReady = true;
+        refreshLocate();
+      })
+      .catch((e) => console.warn('boundaries unavailable', e));
 
   // ---- 搜索：监测城市 + 所有地级市 ----
   ui.renderSearch(
@@ -214,6 +214,18 @@ async function main() {
   particles = new ParticleLayer(map, field);
   particles.setVisible(layerState.particles);
   particles.start();
+  // 风粒子已经在动了，这时再拉边界和植被，不跟风场抢带宽
+  void loadBoundaries();
+  const landcoverLoading = api
+    .landcover()
+    .catch((e) => {
+      console.warn('landcover unavailable, falling back to hand-drawn priors', e);
+      return null as LandcoverGrid | null;
+    })
+    .then((lc) => {
+      landcover = lc;
+      landcoverSettled = true;
+    });
 
   const nowIdx = Math.round(field.timeIndex(Date.now() / 1000));
   time = ui.initTime(wind.times, nowIdx, (idx) => {
@@ -250,7 +262,7 @@ async function main() {
   };
 
   const rebuildModel = () => {
-    if (!field) return;
+    if (!field || !landcoverSettled) return;
     const t0 = performance.now();
     // 模型步长随范围自适应：全国范围约 0.4°，北方范围 0.25°，把格子数控制在 1.5 万左右
     const bb = field.grid.bbox;
@@ -265,7 +277,9 @@ async function main() {
     console.info(`[model] ${(performance.now() - t0).toFixed(0)} ms, global factor ${model.globalFactor.toPrecision(3)}, stations ${model.stationFit.length}`);
     updateStatus();
   };
-  rebuildModel();
+  ui.setStatus('风场就绪，正在计算推算…');
+  // 等植被到位再算模型，并让出一帧先把地图和粒子画出来（手机上模型要跑几秒）
+  void landcoverLoading.then(() => setTimeout(rebuildModel, 50));
   // 调试句柄（浏览器控制台里可用 __pn.map / __pn.boundaries）
   (window as unknown as { __pn: unknown }).__pn = { map, boundaries, stations, heat, get model() { return model; } };
 

@@ -7,10 +7,8 @@ import { config } from './config.ts';
 import { cities, cityByCode } from './cities.ts';
 import { buildLatest, history } from './db.ts';
 import { seasonLevelsFile } from './scraper.ts';
-import { loadWind } from './wind.ts';
-import { loadBoundaries } from './boundaries.ts';
 import { loadLandcover } from './landcover.ts';
-import { buildStatus } from './export.ts';
+import { buildStatus, encodedBoundaries, encodedWind } from './export.ts';
 import { runScrape, runWind, schedulerStatus, startScheduler } from './scheduler.ts';
 import { log, readJson, todayCN } from './util.ts';
 import { defaultSeasonLevels } from '../shared/levels.ts';
@@ -38,12 +36,15 @@ app.get('/api/pollen/history', (c) => {
 });
 
 app.get('/api/wind', (c) => {
-  const w = loadWind();
+  const w = encodedWind();
   if (!w) return c.json({ error: 'wind not ready' }, 503);
   return c.json(w);
 });
 
-app.get('/api/boundaries', (c) => c.json(loadBoundaries() ?? { type: 'FeatureCollection', features: [] }));
+app.get('/api/boundaries', (c) => {
+  c.header('Cache-Control', 'public, max-age=86400');
+  return c.json(encodedBoundaries() ?? { type: 'QuantizedFeatureCollection', q: 1000, features: [] });
+});
 app.get('/api/landcover', (c) => {
   const g = loadLandcover();
   if (!g) return c.json({ error: '植被数据尚未生成，运行 npm run landcover' }, 404);

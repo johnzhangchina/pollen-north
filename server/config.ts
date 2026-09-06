@@ -22,6 +22,7 @@ export const config = {
   windForecastDays: Number(env.WIND_FORECAST_DAYS ?? 3),
   windChunkSize: Number(env.WIND_CHUNK_SIZE ?? 100),
   landcoverStepDeg: Number(env.LANDCOVER_STEP_DEG ?? 0.1),
+  landcoverServeStep: Number(env.LANDCOVER_SERVE_STEP ?? 0.2), // 下发给浏览器时聚合到的格子（模型步长 ≥0.25°，0.2° 足够，体积只有 1/4）
   landcoverConcurrency: Number(env.LANDCOVER_CONCURRENCY ?? 1),
   landcoverRpm: Number(env.LANDCOVER_RPM ?? 60),
   adminToken: env.ADMIN_TOKEN ?? '',
