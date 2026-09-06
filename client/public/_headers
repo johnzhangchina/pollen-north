@@ -1,0 +1,6 @@
+# Cloudflare Pages 响应头：数据 JSON 缓存 15 分钟，带 hash 的静态资源长期缓存
+/api/*
+  Cache-Control: public, max-age=900
+  Access-Control-Allow-Origin: *
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

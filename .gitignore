@@ -1,0 +1,10 @@
+node_modules/
+client/dist/
+data/pollen.sqlite-shm
+data/pollen.sqlite-wal
+data/raw/
+data/wind/
+.env
+.DS_Store
+data/landcover/fractions_north.json
+data/*.log

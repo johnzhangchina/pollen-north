@@ -1,0 +1,116 @@
+# 零成本部署：GitHub Actions 定时抓数据 → 导出静态 JSON → 发布
+#   配置了 CLOUDFLARE_API_TOKEN 时发到 Cloudflare Pages（国内访问更稳），否则发到 GitHub Pages（仓库需公开）。
+# 仓库 Settings 里可配置：
+#   Secrets: CLOUDFLARE_API_TOKEN（权限 Cloudflare Pages: Edit）、CLOUDFLARE_ACCOUNT_ID、TIANDITU_KEY（可选）
+#   Variables: CF_PAGES_PROJECT（Pages 项目名，默认 pollen-north）、TILE_PRESET（amap | tianditu，默认 amap）
+name: publish
+
+on:
+  schedule:
+    - cron: '30 2 * * *' # 每天 10:30（北京时间）：医院 08:00 的读数此时已经发布
+  workflow_dispatch:
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: github-pages
+      url: ${{ steps.gh-pages.outputs.page_url }}
+    env:
+      WIND_BBOX: 73,18,135,54
+      WIND_STEP_DEG: '1'
+      USER_AGENT: pollen-north/0.1 (personal, non-commercial research)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # 上一次成功抓到的风场；今天 Open-Meteo 失败时就继续用它
+      - name: 恢复上次风场
+        uses: actions/cache/restore@v4
+        with:
+          path: data/wind/latest.json
+          key: wind-${{ github.run_id }}
+          restore-keys: wind-
+
+      - name: 边界数据（仓库里没有时生成一次）
+        run: test -f data/boundaries/cities.json || npm run boundaries
+
+      - name: 抓取花粉等级（中国天气网）
+        continue-on-error: true
+        run: npm run scrape
+
+      - name: 刷新风场（Open-Meteo，约 5 分钟）
+        continue-on-error: true
+        run: npm run wind
+
+      - name: 保存风场供下次兜底
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/wind/latest.json
+          key: wind-${{ github.run_id }}
+
+      - name: 选择发布目标
+        id: target
+        run: |
+          repo="${GITHUB_REPOSITORY#*/}"
+          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "cf=true" >> "$GITHUB_OUTPUT"; echo "base=/" >> "$GITHUB_OUTPUT"; echo "api_base=" >> "$GITHUB_OUTPUT"
+          else
+            echo "cf=false" >> "$GITHUB_OUTPUT"; echo "base=/$repo/" >> "$GITHUB_OUTPUT"; echo "api_base=/$repo" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 构建前端（静态接口模式）
+        run: npm run build
+        env:
+          VITE_STATIC_API: '1'
+          VITE_BASE: ${{ steps.target.outputs.base }}
+          VITE_API_BASE: ${{ steps.target.outputs.api_base }}
+          VITE_TILE_PRESET: ${{ vars.TILE_PRESET || 'amap' }}
+          VITE_TIANDITU_KEY: ${{ secrets.TIANDITU_KEY }}
+
+      - name: 导出静态 JSON
+        run: npm run export
+
+      - name: 发布到 Cloudflare Pages
+        if: steps.target.outputs.cf == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy client/dist --project-name=${{ vars.CF_PAGES_PROJECT || 'pollen-north' }} --commit-dirty=true
+
+      - name: 上传 GitHub Pages 产物
+        if: steps.target.outputs.cf != 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: client/dist
+
+      - name: 发布到 GitHub Pages
+        if: steps.target.outputs.cf != 'true'
+        id: gh-pages
+        uses: actions/deploy-pages@v4
+
+      - name: 把花粉历史库提交回仓库
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add data/pollen.sqlite data/season_levels.json data/boundaries/cities.json
+          git diff --cached --quiet || git commit -m "data: $(TZ=Asia/Shanghai date +%F) 花粉等级快照"
+          git push

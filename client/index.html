@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>花粉风图</title>
+    <meta name="description" content="全国花粉监测城市等级、风场与扩散趋势推算。参考用，非官方预报，不构成医疗建议。" />
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo" aria-hidden="true">🌬️</span>
+          <div>
+            <h1>花粉风图</h1>
+            <p class="sub">站点等级 · 风场 · 扩散趋势推算 <em>参考用，非官方预报</em></p>
+          </div>
+        </div>
+        <div id="status" class="status">加载中…</div>
+      </header>
+
+      <main class="main">
+        <div id="map" class="map" role="application" aria-label="花粉地图"></div>
+        <aside class="panel">
+          <nav class="tabs" id="tabs">
+            <button data-tab="cities" class="active">城市</button>
+            <button data-tab="compare">对照</button>
+            <button data-tab="about">说明</button>
+          </nav>
+          <section id="tab-cities" class="tab active">
+            <div class="search-box">
+              <input id="search" type="search" placeholder="搜索城市：银川 / yinchuan / 巴彦淖尔…" autocomplete="off" aria-label="搜索城市" />
+              <ul id="search-results" class="search-results" hidden></ul>
+            </div>
+            <div id="locate-card" class="locate-card"></div>
+            <div id="region-filter" class="region-filter"></div>
+            <ul id="city-list" class="city-list"></ul>
+          </section>
+          <section id="tab-compare" class="tab"></section>
+          <section id="tab-about" class="tab"></section>
+        </aside>
+      </main>
+
+      <footer class="controls">
+        <div id="layers" class="layers"></div>
+        <div class="timebar">
+          <button id="play" title="播放 / 暂停" aria-label="播放">▶</button>
+          <input id="time" type="range" min="0" max="0" value="0" step="1" aria-label="时间" />
+          <span id="time-label" class="time-label">—</span>
+        </div>
+        <div id="legend" class="legend"></div>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
