@@ -8,6 +8,8 @@ name: publish
 on:
   schedule:
     - cron: '30 2 * * *' # 每天 10:30（北京时间）：医院 08:00 的读数此时已经发布
+  push:
+    branches: [main] # 代码改动立即发布；workflow 自己用 GITHUB_TOKEN 提交的数据快照不会再触发
   workflow_dispatch:
 
 concurrency:

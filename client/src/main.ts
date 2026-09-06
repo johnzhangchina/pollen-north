@@ -31,6 +31,7 @@ async function main() {
   ]);
   let levels: SeasonLevel[] = levels0;
 
+  ui.initSheet(map);
   const heat = new HeatLayer(map, levels);
   const boundaries = new BoundaryLayer(map, levels, (code) => stations.focus(code));
   const stations = new StationLayer(map, cities, levels);

@@ -29,6 +29,7 @@ export class BoundaryLayer {
   private map: L.Map;
   private group = L.layerGroup();
   private labelsStation = L.layerGroup();
+  private labelsStationMinor = L.layerGroup(); // 非重点站，缩得很小时隐藏
   private labelsOther = L.layerGroup();
   private geo: L.GeoJSON | null = null;
   private cityByAdcode = new Map<number, City>();
@@ -62,6 +63,7 @@ export class BoundaryLayer {
     this.layerByAdcode.clear();
     if (this.geo) this.group.removeLayer(this.geo);
     this.labelsStation.clearLayers();
+    this.labelsStationMinor.clearLayers();
     this.labelsOther.clearLayers();
     this.geo = L.geoJSON(fc as GeoJSON.GeoJsonObject, {
       style: (f) => this.styleFor(f as GeoJSON.Feature<GeoJSON.Geometry, BoundaryProps>),
@@ -84,7 +86,7 @@ export class BoundaryLayer {
             iconSize: [0, 0],
           }),
         });
-        (c ? this.labelsStation : this.labelsOther).addLayer(label);
+        (c ? (c.core ? this.labelsStation : this.labelsStationMinor) : this.labelsOther).addLayer(label);
       },
     });
     this.group.addLayer(this.geo);
@@ -149,8 +151,12 @@ export class BoundaryLayer {
   }
 
   private updateLabelVisibility() {
-    if (this.map.getZoom() >= 7) this.group.addLayer(this.labelsOther);
+    const z = this.map.getZoom();
+    if (z >= 7) this.group.addLayer(this.labelsOther);
     else this.group.removeLayer(this.labelsOther);
+    // 全国视野（手机上约 3 级）只标重点站，否则京津冀一带的名字叠成一团
+    if (z >= 4) this.group.addLayer(this.labelsStationMinor);
+    else this.group.removeLayer(this.labelsStationMinor);
   }
 
   private restyle() {

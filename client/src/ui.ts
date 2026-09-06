@@ -1,3 +1,4 @@
+import type * as L from 'leaflet';
 import type { City, CityLatest, OfficialAlert, Region, SeasonLevel } from '../../shared/types.ts';
 import { levelColor, levelIndexFor, levelName } from '../../shared/levels.ts';
 import { fmtCN } from './geo.ts';
@@ -377,4 +378,48 @@ export function renderAbout() {
 <li>站点是一城一点的日值，推算层在远离站点的地方只有示意意义。</li>
 </ul>
 </article>`;
+}
+
+/**
+ * 手机布局：把底部控制条搬进抽屉顶部，抽屉支持点按/上下滑动切换三档高度；
+ * 回到宽屏时再搬回页脚。
+ */
+export function initSheet(map: L.Map) {
+  const panel = document.getElementById('panel')!;
+  const controls = document.querySelector<HTMLElement>('footer.controls')!;
+  const handle = document.getElementById('sheet-handle')!;
+  const app = document.getElementById('app')!;
+  const mq = window.matchMedia('(max-width: 860px)');
+  const place = () => {
+    if (mq.matches) {
+      if (controls.parentElement !== panel) panel.insertBefore(controls, handle.nextSibling);
+      map.attributionControl.setPosition('topright'); // 底部被抽屉盖住
+    } else {
+      if (controls.parentElement !== app) app.appendChild(controls);
+      panel.classList.remove('expanded', 'collapsed');
+      map.attributionControl.setPosition('bottomright');
+    }
+    setTimeout(() => map.invalidateSize(), 300);
+  };
+  place();
+  mq.addEventListener('change', place);
+
+  const states = ['collapsed', '', 'expanded'] as const;
+  const current = () => (panel.classList.contains('expanded') ? 2 : panel.classList.contains('collapsed') ? 0 : 1);
+  const setState = (i: number) => {
+    const k = Math.max(0, Math.min(2, i));
+    panel.classList.remove('expanded', 'collapsed');
+    if (states[k]) panel.classList.add(states[k]);
+  };
+  handle.addEventListener('click', () => setState(current() === 2 ? 1 : current() + 1));
+  let y0: number | null = null;
+  handle.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; }, { passive: true });
+  handle.addEventListener('touchend', (e) => {
+    if (y0 == null) return;
+    const dy = e.changedTouches[0].clientY - y0;
+    y0 = null;
+    if (Math.abs(dy) < 24) return;
+    setState(current() + (dy < 0 ? 1 : -1));
+    e.preventDefault();
+  });
 }
