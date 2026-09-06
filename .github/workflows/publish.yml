@@ -90,11 +90,19 @@ jobs:
       - name: 导出静态 JSON
         run: npm run export
 
-      # Pages 项目不存在时先建一个（已存在会报错，忽略），控制台里不用手动创建
-      - name: 确保 Cloudflare Pages 项目存在
+      # Pages 项目不存在时先建一个，控制台里不用手动创建
+      - name: 检查 Cloudflare Pages 项目
         if: steps.target.outputs.cf == 'true'
+        id: cfproj
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/pages/projects/${{ vars.CF_PAGES_PROJECT || 'pollen-north' }}")
+          echo "exists=$([ "$code" = 200 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: 创建 Cloudflare Pages 项目
+        if: steps.target.outputs.cf == 'true' && steps.cfproj.outputs.exists != 'true'
         uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
